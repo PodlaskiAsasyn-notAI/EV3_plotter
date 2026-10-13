@@ -23,7 +23,7 @@ class Arm():
 
         # Initialize the motors.
         self.first_motor = Motor(Port.B, Direction.CLOCKWISE)
-        self.second_motor = Motor(Port.C, Direction.CLOCKWISE)
+        self.second_motor = Motor(Port.C, Direction.COUNTERCLOCKWISE)
 
         #put in measured axle to axle distance (in mm)
         self.arm_a = 200
@@ -34,8 +34,8 @@ class Arm():
         self.limit_alpha = (0, 180)
         self.limit_beta = (0, 180)
 
-        self.first_motor.reset_angle(0)
-        self.second_motor.reset_angle(0)
+        # self.first_motor.reset_angle(0)
+        # self.second_motor.reset_angle(0)
 
     def move_first_motor(self, deg, dir='+'):
         target = 0
