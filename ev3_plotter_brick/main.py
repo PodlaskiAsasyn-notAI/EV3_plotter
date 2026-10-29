@@ -18,12 +18,12 @@ import math
 
 # Write your program here.
 class Arm():
-    def __innit__(self):
+    def __init__(self):
         ev3 = EV3Brick()
 
         # Initialize the motors.
-        self.first_motor = Motor(Port.B, Direction.CLOCKWISE)
-        self.second_motor = Motor(Port.C, Direction.COUNTERCLOCKWISE)
+        self.first_motor = Motor(Port.D, Direction.CLOCKWISE, gears=[1, 24])
+        self.second_motor = Motor(Port.C, Direction.COUNTERCLOCKWISE, gears=[1, 24])
 
         # configure strict motor tolerances
         self.first_motor.control.target_tolerances(5, 1)
@@ -31,19 +31,19 @@ class Arm():
 
 
         #put in measured axle to axle distance (in mm)
-        self.arm_a = 200
-        self.arm_b = 200
+        self.arm_a = 125
+        self.arm_b = 110
 
         # put in corner coords and draw region dimentions
-        self.corner = (100, -50)
-        self.box_size = (100, 100)
+        self.corner = (50, -120)
+        self.box_size = (150, 240)
 
         # set the phisical limits for servo motors
-        self.limit_alpha = (0, 180)
-        self.limit_beta = (0, 180)
+        self.limit_alpha = (-120, 120)
+        self.limit_beta = (-170, 0)
 
-        # self.first_motor.reset_angle(0)
-        # self.second_motor.reset_angle(0)
+        self.first_motor.reset_angle(0)
+        self.second_motor.reset_angle(0)
 
     def calc_angles(self, x, y):
         # validation
@@ -72,17 +72,19 @@ class Arm():
         y += self.corner[1]
         return (x, y)
 
-    def goto(self, x, y, speed=30):
-        x, y = self.translate_coords(x, y)
+    def goto(self, x, y, speed=30, translate=True):
+        if translate:
+            x, y = self.translate_coords(x, y)
         angles = self.calc_angles(x, y)
         if not angles:
             return None
         alpha, beta = angles
 
         self.second_motor.run_target(speed, beta, wait=False)
-        self.first_motor.track_targer(speed, alpha, wait=True)
-
-        return None
+        self.first_motor.run_target(speed, alpha, wait=False)
+        while not (self.first_motor.control.done() and self.second_motor.control.done()):
+            wait(10)
+        return True
 
     def draw_line(self, x0, y0, x1, y1, speed=30):
         """
@@ -101,34 +103,44 @@ class Arm():
         alpha_1, beta_1 = angles_1
 
         # korekta pozycji
-        if abs(self.first_motor.angle() - alpha_0) < 10 or abs(self.second_motor.angle() - beta_0) < 10:
-            self.goto(x0, y0)
+        if abs(self.first_motor.angle() - alpha_0) > 10 or abs(self.second_motor.angle() - beta_0) > 10:
+            if self.goto(x0, y0, translate=False) is None:
+                return None
+            print("adjustment was needed")
 
-        total_distance = math.sqrt(abs(x0 - x1)**2 + abs(y0 - y1))
-        total_distance = round(total_distance, 2)
+        total_distance = math.sqrt(abs(x0 - x1)**2 + abs(y0 - y1)**2)
+        # total_distance = round(total_distance, 2)
 
         total_time = total_distance / speed
 
         delta_alpha = alpha_1 - alpha_0
         omega_alpha = delta_alpha / total_time
 
-        delta_beta = beta_1 - beta_1
+        delta_beta = beta_1 - beta_0
         omega_beta = delta_beta / total_time
-
-        self.first_motor.run_time(omega_alpha, total_time, then=Stop.STOP, wait=False)
-        self.second_motor.run_time(omega_beta, total_time, then=Stop.STOP, wait=True)
+        print("starting alpha: {}, starting beta: {}".format(alpha_0, beta_0))
+        print("target alpha: {}, target beta: {}".format(alpha_1, beta_1))
+        print("omega aplha: {}, omega beta: {}".format(omega_alpha, omega_beta))
+        
+        self.first_motor.run(omega_alpha)
+        self.second_motor.run(omega_beta)
+        wait(total_time * 1000)
+        self.first_motor.stop()
+        self.second_motor.stop()
         return 1
 
     def go_home(self):
         """
         Homes the arm to default location (alpha = 0, beta = 0)
         """
-        x, y = self.translate_coords(0, 0)
-        x += self.box_size[0]
-        y += (self.box_size[1] / 2)
-        self.goto(x, y)
+        # x, y = self.translate_coords(0, 0)
+        # x += self.box_size[0]
+        # y += (self.box_size[1] / 2)
+        # self.goto(x, y)
+        self.second_motor.run_target(30, 0, wait=False)
+        self.first_motor.run_target(30, 0, wait=True)
 
-    def check_poossible_range(self, ran=None, step=10, save=False, path="possible_locations.txt"):
+    def check_possible_range(self, ran=None, step=10, save=False, path="possible_locations.txt"):
         """
         Goes through all the points, range from absolute point (0, 0) step apart from each other.
         If range is not specified, then it's automatically calculated.
@@ -145,25 +157,34 @@ class Arm():
                     output.append((i, j))
         if save:
             with open(path, "w", encoding="utf-8") as file:
-                output_str = [str(line) + '/n' for line in output]
-                file.writelines(output_str)
+                for line in output:
+                    file.write("{}, {}\n".format(line[0], line[1]))
         return output
 
     def draw_box(self):
         """
         Draws a maximum possible rectangle
         """
-        # bottom right
-        x0, y0 = self.corner
-        # bottom left
-        x1 = self.corner[0] + self.box_size[0]
-        y1 = self.corner[1]
-        # top left
-        x2 = self.corner[0] + self.box_size[0]
-        y2 = self.corner[1] + self.box_size[1]
-        # top right
-        x3 = self.corner[0]
-        y3 = self.corner[1] + self.box_size[1]
+        # # bottom right
+        # x0, y0 = self.corner
+        # # bottom left
+        # x1 = self.corner[0] + self.box_size[0]
+        # y1 = self.corner[1]
+        # # top left
+        # x2 = self.corner[0] + self.box_size[0]
+        # y2 = self.corner[1] + self.box_size[1]
+        # # top right
+        # x3 = self.corner[0]
+        # y3 = self.corner[1] + self.box_size[1]
+
+        x0 = 0
+        y0 = 0
+        x1 = self.box_size[0]
+        y1 = 0
+        x2 = self.box_size[0]
+        y2 = self.box_size[1]
+        x3 = 0
+        y3 = self.box_size[1]
 
         self.draw_line(x0, y0, x1, y1)
         self.draw_line(x1, y1, x2, y2)
@@ -179,8 +200,20 @@ class Arm():
             max_angle = self.limit_alpha[1]
         max_angle = min(max_angle, self.limit_alpha[1])
 
-        self.first_motor.run_angle(10, min_angle)
-        self.first_motor.run_angle(10, max_angle)
+        speed = 30
+        # print("min angle")
+        self.first_motor.run_angle(speed, min_angle)
+        # print("-min angle")
+        
+        self.first_motor.run_angle(speed, -min_angle)
+
+        # print("max angle")
+
+        self.first_motor.run_angle(speed, max_angle)
+        # print("-max angle")
+        self.first_motor.run_angle(speed, -max_angle)
+
+        # self.first_motor.run_angle(10, 0)
 
     def sweep_second_motor(self, min_angle=None, max_angle=None):
         if min_angle is None:
@@ -191,12 +224,22 @@ class Arm():
             max_angle = self.limit_beta[1]
         max_angle = min(max_angle, self.limit_beta[1])
 
-        self.second_motor.run_angle(10, min_angle)
-        self.second_motor.run_angle(10, max_angle)
+        speed = 30
+        self.second_motor.run_angle(speed, min_angle)
+        self.second_motor.run_angle(speed, -min_angle)
+        self.second_motor.run_angle(speed, max_angle)
+        self.second_motor.run_angle(speed, -max_angle)
+
 
 
 def main():
     arm = Arm()
+    # arm.check_possible_range(350, save=True, step=10)
+    # arm.sweep_second_motor()
+    # arm.sweep_first_motor()
+    arm.draw_box()
+    # arm.goto(50, 50)
+    arm.go_home()
 
 
 if __name__ == "__main__":
