@@ -170,7 +170,29 @@ class Arm():
         self.draw_line(x2, y2, x3, y3)
         self.draw_line(x3, y3, x0, y0)
 
+    def sweep_first_motor(self, min_angle=None, max_angle=None):
+        if min_angle is None:
+            min_angle = self.limit_alpha[0]
+        min_angle = max(min_angle, self.limit_alpha[0])
 
+        if max_angle is None:
+            max_angle = self.limit_alpha[1]
+        max_angle = min(max_angle, self.limit_alpha[1])
+
+        self.first_motor.run_angle(10, min_angle)
+        self.first_motor.run_angle(10, max_angle)
+
+    def sweep_second_motor(self, min_angle=None, max_angle=None):
+        if min_angle is None:
+            min_angle = self.limit_beta[0]
+        min_angle = max(min_angle, self.limit_beta[0])
+
+        if max_angle is None:
+            max_angle = self.limit_beta[1]
+        max_angle = min(max_angle, self.limit_beta[1])
+
+        self.second_motor.run_angle(10, min_angle)
+        self.second_motor.run_angle(10, max_angle)
 
 
 def main():
