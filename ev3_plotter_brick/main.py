@@ -72,21 +72,21 @@ class Arm():
         y += self.corner[1]
         return (x, y)
 
-    def goto(self, x, y):
+    def goto(self, x, y, speed=30):
         x, y = self.translate_coords(x, y)
         angles = self.calc_angles(x, y)
         if not angles:
             return None
         alpha, beta = angles
 
-        self.second_motor.run_target(30, beta, wait=False)
-        self.first_motor.track_targer(30, alpha, wait=True)
+        self.second_motor.run_target(speed, beta, wait=False)
+        self.first_motor.track_targer(speed, alpha, wait=True)
 
         return None
 
     def draw_line(self, x0, y0, x1, y1, speed=30):
         """
-
+        Draws a straight line between two points. Steers the engines via calculating optimal omegas.
         """
         # translacja koordynatow na uzywanego boxa
         x0, y0 = self.translate_coords(x0, y0)
@@ -148,6 +148,28 @@ class Arm():
                 output_str = [str(line) + '/n' for line in output]
                 file.writelines(output_str)
         return output
+
+    def draw_box(self):
+        """
+        Draws a maximum possible rectangle
+        """
+        # bottom right
+        x0, y0 = self.corner
+        # bottom left
+        x1 = self.corner[0] + self.box_size[0]
+        y1 = self.corner[1]
+        # top left
+        x2 = self.corner[0] + self.box_size[0]
+        y2 = self.corner[1] + self.box_size[1]
+        # top right
+        x3 = self.corner[0]
+        y3 = self.corner[1] + self.box_size[1]
+
+        self.draw_line(x0, y0, x1, y1)
+        self.draw_line(x1, y1, x2, y2)
+        self.draw_line(x2, y2, x3, y3)
+        self.draw_line(x3, y3, x0, y0)
+
 
 
 
